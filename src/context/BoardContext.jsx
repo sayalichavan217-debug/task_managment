@@ -1,11 +1,12 @@
 import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
 import confetti from 'canvas-confetti';
-import { COLUMNS, INITIAL_TASKS, TEAM_MEMBERS, getInitials } from '../constants/data';
+import { COLUMNS, INITIAL_TASKS, DEFAULT_USERS, USER_COLOR_PALETTE, getInitials } from '../constants/data';
 
 const STORAGE_KEY_TASKS = 'jira_kanban_tasks_v3';
 const STORAGE_KEY_COLUMNS = 'jira_kanban_columns_v3';
 const STORAGE_KEY_THEME = 'jira_kanban_theme_v2';
 const STORAGE_KEY_SIDEBAR = 'jira_kanban_sidebar_v2';
+const STORAGE_KEY_USERS = 'jira_users';
 
 const BoardContext = createContext(null);
 
@@ -39,6 +40,23 @@ export const BoardProvider = ({ children }) => {
     }
   });
 
+  // Users / Team state
+  const [users, setUsers] = useState(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY_USERS);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed;
+        }
+      }
+      return DEFAULT_USERS;
+    } catch {
+      return DEFAULT_USERS;
+    }
+  });
+
+  // Tasks state
   const [tasks, setTasks] = useState(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY_TASKS);
@@ -73,11 +91,12 @@ export const BoardProvider = ({ children }) => {
   // View state: 'board' | 'analytics'
   const [activeView, setActiveView] = useState('board');
 
-  // Selected task id (derived reactivity)
+  // Modal states
   const [selectedTaskId, setSelectedTaskId] = useState(null);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [createModalDefaultColumn, setCreateModalDefaultColumn] = useState('todo');
   const [deleteConfirmTask, setDeleteConfirmTask] = useState(null);
+  const [isUserModalOpen, setIsUserModalOpen] = useState(false);
 
   // Dragging state
   const [draggingTaskId, setDraggingTaskId] = useState(null);
@@ -127,6 +146,15 @@ export const BoardProvider = ({ children }) => {
     }
   }, [columns]);
 
+  // Sync users to storage
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEY_USERS, JSON.stringify(users));
+    } catch (err) {
+      console.warn(err);
+    }
+  }, [users]);
+
   // Sync tasks to storage
   useEffect(() => {
     try {
@@ -135,6 +163,100 @@ export const BoardProvider = ({ children }) => {
       console.warn(err);
     }
   }, [tasks]);
+
+  // User helper to find a user by ID or name
+  const getUserById = useCallback(
+    (userIdOrName) => {
+      if (!userIdOrName || userIdOrName === 'unassigned') return null;
+      return (
+        users.find(
+          (u) =>
+            u.id === userIdOrName ||
+            u.name.toLowerCase() === String(userIdOrName).toLowerCase() ||
+            (userIdOrName === 'sarah' && u.id === 'USR-101') ||
+            (userIdOrName === 'alex' && u.id === 'USR-102') ||
+            (userIdOrName === 'david' && u.id === 'USR-103') ||
+            (userIdOrName === 'elena' && u.id === 'USR-104')
+        ) || null
+      );
+    },
+    [users]
+  );
+
+  // User Management
+  const addUser = useCallback(
+    (userData) => {
+      if (!userData.name?.trim() || !userData.email?.trim()) {
+        addToast('Validation Error', 'Name and Email are required fields.', 'error');
+        return null;
+      }
+
+      // Generate next USR-ID
+      const existingNumbers = users
+        .map((u) => {
+          const match = u.id?.match(/^USR-(\d+)$/i);
+          return match ? parseInt(match[1], 10) : 0;
+        })
+        .filter((n) => !isNaN(n));
+      const maxNum = existingNumbers.length > 0 ? Math.max(...existingNumbers) : 100;
+      const nextId = `USR-${maxNum + 1}`;
+
+      const defaultColor =
+        USER_COLOR_PALETTE[users.length % USER_COLOR_PALETTE.length] || '#3B82F6';
+
+      const newUser = {
+        id: nextId,
+        name: userData.name.trim(),
+        email: userData.email.trim().toLowerCase(),
+        color: userData.color || defaultColor
+      };
+
+      setUsers((prev) => [...prev, newUser]);
+      addToast('Member Added', `${newUser.name} was added to the team.`, 'success');
+      return newUser;
+    },
+    [users, addToast]
+  );
+
+  const deleteUser = useCallback(
+    (userId) => {
+      const target = users.find((u) => u.id === userId);
+      if (!target) return { success: false, reason: 'User not found' };
+
+      // Check if user has assigned tasks
+      const assignedTasks = tasks.filter((t) => {
+        return (
+          t.assigneeId === userId ||
+          t.assignee === userId ||
+          t.assignee === target.name ||
+          (userId === 'USR-101' && t.assigneeId === 'sarah') ||
+          (userId === 'USR-102' && t.assigneeId === 'alex') ||
+          (userId === 'USR-103' && t.assigneeId === 'david') ||
+          (userId === 'USR-104' && t.assigneeId === 'elena')
+        );
+      });
+
+      if (assignedTasks.length > 0) {
+        addToast(
+          'Cannot Delete Member',
+          `${target.name} has ${assignedTasks.length} assigned task(s). Please reassign or delete them first.`,
+          'error'
+        );
+        return { success: false, reason: 'has_tasks', count: assignedTasks.length };
+      }
+
+      setUsers((prev) => prev.filter((u) => u.id !== userId));
+
+      // Reset filter if deleting the currently filtered user
+      if (assigneeFilter === userId) {
+        setAssigneeFilter('all');
+      }
+
+      addToast('Member Removed', `${target.name} was deleted from team.`, 'info');
+      return { success: true };
+    },
+    [users, tasks, assigneeFilter, addToast]
+  );
 
   // Derived selected task object
   const selectedTask = useMemo(() => {
@@ -173,102 +295,123 @@ export const BoardProvider = ({ children }) => {
   }, [tasks]);
 
   // CRUD Operations
-  const createTask = useCallback((taskData) => {
-    const nextKey = generateNextIssueKey();
-    const newTask = {
-      id: nextKey,
-      title: taskData.title.trim(),
-      description: taskData.description?.trim() || '',
-      columnId: taskData.columnId || 'todo',
-      issueType: taskData.issueType || 'task',
-      priority: taskData.priority || 'medium',
-      assigneeId: taskData.assigneeId || (TEAM_MEMBERS.find((m) => m.isCurrentUser) || TEAM_MEMBERS[0]).id,
-      tags: Array.isArray(taskData.tags) ? taskData.tags : [],
-      storyPoints: taskData.storyPoints ? Number(taskData.storyPoints) : 1,
-      dueDate: taskData.dueDate || '',
-      subtasks: taskData.subtasks || [],
-      comments: [],
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    };
+  const createTask = useCallback(
+    (taskData) => {
+      const nextKey = generateNextIssueKey();
+      const defaultAssigneeId = users[0]?.id || 'unassigned';
+      const assignedUser = getUserById(taskData.assigneeId || taskData.assignee);
 
-    setTasks((prev) => [newTask, ...prev]);
-    addToast('Task Created', `Created issue ${newTask.id}: "${newTask.title.slice(0, 30)}..."`, 'success');
-    return newTask;
-  }, [generateNextIssueKey, addToast]);
-
-  const updateTask = useCallback((taskId, updates) => {
-    setTasks((prev) =>
-      prev.map((task) => {
-        if (task.id === taskId) {
-          return {
-            ...task,
-            ...updates,
-            updatedAt: new Date().toISOString()
-          };
-        }
-        return task;
-      })
-    );
-    addToast('Task Updated', `Changes saved for ${taskId}`, 'info');
-  }, [addToast]);
-
-  const deleteTask = useCallback((taskId) => {
-    const target = tasks.find((t) => t.id === taskId);
-    setTasks((prev) => prev.filter((t) => t.id !== taskId));
-    if (selectedTaskId === taskId) {
-      setSelectedTaskId(null);
-    }
-    setDeleteConfirmTask(null);
-    addToast('Task Deleted', `Removed issue ${taskId}${target ? ` (${target.title.slice(0, 25)})` : ''}`, 'warning');
-  }, [tasks, selectedTaskId, addToast]);
-
-  // Move / Reorder Task
-  const moveTask = useCallback((taskId, targetColumnId, newIndex = null) => {
-    const task = tasks.find((t) => t.id === taskId);
-    if (!task) return;
-
-    const sourceColumnId = task.columnId;
-    const isColumnChange = sourceColumnId !== targetColumnId;
-
-    if (targetColumnId === 'done' && isColumnChange) {
-      try {
-        confetti({
-          particleCount: 80,
-          spread: 70,
-          origin: { y: 0.6 }
-        });
-      } catch {
-        // Fallback gracefully
-      }
-    }
-
-    setTasks((prev) => {
-      const withoutTask = prev.filter((t) => t.id !== taskId);
-      const updatedTask = {
-        ...task,
-        columnId: targetColumnId,
+      const newTask = {
+        id: nextKey,
+        title: taskData.title.trim(),
+        description: taskData.description?.trim() || '',
+        columnId: taskData.columnId || 'todo',
+        issueType: taskData.issueType || 'task',
+        priority: taskData.priority || 'medium',
+        assigneeId: taskData.assigneeId || assignedUser?.id || defaultAssigneeId,
+        assignee: assignedUser ? assignedUser.name : (taskData.assignee || 'Unassigned'),
+        tags: Array.isArray(taskData.tags) ? taskData.tags : [],
+        storyPoints: taskData.storyPoints ? Number(taskData.storyPoints) : 1,
+        dueDate: taskData.dueDate || '',
+        subtasks: taskData.subtasks || [],
+        comments: [],
+        createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       };
 
-      if (newIndex === null || newIndex === undefined) {
-        return [...withoutTask, updatedTask];
+      setTasks((prev) => [newTask, ...prev]);
+      addToast('Task Created', `Created issue ${newTask.id}: "${newTask.title.slice(0, 30)}..."`, 'success');
+      return newTask;
+    },
+    [generateNextIssueKey, users, getUserById, addToast]
+  );
+
+  const updateTask = useCallback(
+    (taskId, updates) => {
+      setTasks((prev) =>
+        prev.map((task) => {
+          if (task.id === taskId) {
+            let updatedFields = { ...updates };
+            if (updates.assigneeId !== undefined) {
+              const u = getUserById(updates.assigneeId);
+              updatedFields.assignee = u ? u.name : 'Unassigned';
+            }
+            return {
+              ...task,
+              ...updatedFields,
+              updatedAt: new Date().toISOString()
+            };
+          }
+          return task;
+        })
+      );
+      addToast('Task Updated', `Changes saved for ${taskId}`, 'info');
+    },
+    [getUserById, addToast]
+  );
+
+  const deleteTask = useCallback(
+    (taskId) => {
+      const target = tasks.find((t) => t.id === taskId);
+      setTasks((prev) => prev.filter((t) => t.id !== taskId));
+      if (selectedTaskId === taskId) {
+        setSelectedTaskId(null);
+      }
+      setDeleteConfirmTask(null);
+      addToast('Task Deleted', `Removed issue ${taskId}${target ? ` (${target.title.slice(0, 25)})` : ''}`, 'warning');
+    },
+    [tasks, selectedTaskId, addToast]
+  );
+
+  // Move / Reorder Task
+  const moveTask = useCallback(
+    (taskId, targetColumnId, newIndex = null) => {
+      const task = tasks.find((t) => t.id === taskId);
+      if (!task) return;
+
+      const sourceColumnId = task.columnId;
+      const isColumnChange = sourceColumnId !== targetColumnId;
+
+      if (targetColumnId === 'done' && isColumnChange) {
+        try {
+          confetti({
+            particleCount: 80,
+            spread: 70,
+            origin: { y: 0.6 }
+          });
+        } catch {
+          // Fallback gracefully
+        }
       }
 
-      const targetColumnTasks = withoutTask.filter((t) => t.columnId === targetColumnId);
-      const otherColumnTasks = withoutTask.filter((t) => t.columnId !== targetColumnId);
+      setTasks((prev) => {
+        const withoutTask = prev.filter((t) => t.id !== taskId);
+        const updatedTask = {
+          ...task,
+          columnId: targetColumnId,
+          updatedAt: new Date().toISOString()
+        };
 
-      const clampedIndex = Math.max(0, Math.min(newIndex, targetColumnTasks.length));
-      targetColumnTasks.splice(clampedIndex, 0, updatedTask);
+        if (newIndex === null || newIndex === undefined) {
+          return [...withoutTask, updatedTask];
+        }
 
-      return [...otherColumnTasks, ...targetColumnTasks];
-    });
+        const targetColumnTasks = withoutTask.filter((t) => t.columnId === targetColumnId);
+        const otherColumnTasks = withoutTask.filter((t) => t.columnId !== targetColumnId);
 
-    if (isColumnChange) {
-      const colObj = columns.find((c) => c.id === targetColumnId);
-      addToast('Status Changed', `${taskId} moved to ${colObj ? colObj.title : targetColumnId}`, 'success');
-    }
-  }, [tasks, columns, addToast]);
+        const clampedIndex = Math.max(0, Math.min(newIndex, targetColumnTasks.length));
+        targetColumnTasks.splice(clampedIndex, 0, updatedTask);
+
+        return [...otherColumnTasks, ...targetColumnTasks];
+      });
+
+      if (isColumnChange) {
+        const colObj = columns.find((c) => c.id === targetColumnId);
+        addToast('Status Changed', `${taskId} moved to ${colObj ? colObj.title : targetColumnId}`, 'success');
+      }
+    },
+    [tasks, columns, addToast]
+  );
 
   // Subtask management
   const addSubtask = useCallback((taskId, title) => {
@@ -327,43 +470,46 @@ export const BoardProvider = ({ children }) => {
   }, []);
 
   // Comments management
-  const addComment = useCallback((taskId, text, authorName) => {
-    if (!text?.trim()) return;
-    const defaultUser = TEAM_MEMBERS.find((m) => m.isCurrentUser) || TEAM_MEMBERS[0];
-    const authorObj = authorName
-      ? (TEAM_MEMBERS.find((m) => m.name === authorName) || defaultUser)
-      : defaultUser;
-    const newComment = {
-      id: `comment-${Date.now()}`,
-      author: authorObj.name,
-      avatar: authorObj.initials || getInitials(authorObj.name),
-      text: text.trim(),
-      createdAt: new Date().toISOString()
-    };
+  const addComment = useCallback(
+    (taskId, text, authorName) => {
+      if (!text?.trim()) return;
+      const defaultUser = users[0] || { name: 'Sarah Connor', color: '#7C3AED' };
+      const authorObj = authorName ? users.find((m) => m.name === authorName) || defaultUser : defaultUser;
+      const newComment = {
+        id: `comment-${Date.now()}`,
+        author: authorObj.name,
+        avatar: getInitials(authorObj.name),
+        text: text.trim(),
+        createdAt: new Date().toISOString()
+      };
 
-    setTasks((prev) =>
-      prev.map((task) => {
-        if (task.id === taskId) {
-          return {
-            ...task,
-            comments: [...(task.comments || []), newComment],
-            updatedAt: new Date().toISOString()
-          };
-        }
-        return task;
-      })
-    );
-    addToast('Comment Posted', `Added feedback to ${taskId}`, 'info');
-  }, [addToast]);
+      setTasks((prev) =>
+        prev.map((task) => {
+          if (task.id === taskId) {
+            return {
+              ...task,
+              comments: [...(task.comments || []), newComment],
+              updatedAt: new Date().toISOString()
+            };
+          }
+          return task;
+        })
+      );
+      addToast('Comment Posted', `Added feedback to ${taskId}`, 'info');
+    },
+    [users, addToast]
+  );
 
   // Reset to sample mock data
   const resetToMockData = useCallback(() => {
     setTasks(INITIAL_TASKS);
     setColumns(COLUMNS);
+    setUsers(DEFAULT_USERS);
     setSelectedTaskId(null);
     localStorage.setItem(STORAGE_KEY_TASKS, JSON.stringify(INITIAL_TASKS));
     localStorage.setItem(STORAGE_KEY_COLUMNS, JSON.stringify(COLUMNS));
-    addToast('Board Reset', 'Restored initial sample Jira workspace data', 'info');
+    localStorage.setItem(STORAGE_KEY_USERS, JSON.stringify(DEFAULT_USERS));
+    addToast('Board Reset', 'Restored initial sample Jira workspace and team data', 'info');
   }, [addToast]);
 
   // Filtered tasks computation
@@ -371,9 +517,9 @@ export const BoardProvider = ({ children }) => {
     return tasks.filter((task) => {
       if (searchQuery.trim()) {
         const query = searchQuery.toLowerCase().trim();
-        const matchesTitle = task.title.toLowerCase().includes(query);
-        const matchesDesc = task.description.toLowerCase().includes(query);
-        const matchesId = task.id.toLowerCase().includes(query);
+        const matchesTitle = task.title?.toLowerCase().includes(query);
+        const matchesDesc = task.description?.toLowerCase().includes(query);
+        const matchesId = task.id?.toLowerCase().includes(query);
         const matchesTags = task.tags?.some((t) => t.toLowerCase().includes(query));
         if (!matchesTitle && !matchesDesc && !matchesId && !matchesTags) {
           return false;
@@ -388,13 +534,36 @@ export const BoardProvider = ({ children }) => {
         return false;
       }
 
-      if (assigneeFilter !== 'all' && task.assigneeId !== assigneeFilter) {
-        return false;
+      if (assigneeFilter !== 'all') {
+        if (assigneeFilter === 'unassigned') {
+          const isUnassigned =
+            !task.assigneeId ||
+            task.assigneeId === 'unassigned' ||
+            task.assignee === 'Unassigned' ||
+            task.assigneeId === '';
+          if (!isUnassigned) return false;
+        } else {
+          const matchedUser = users.find((u) => u.id === assigneeFilter);
+          const isMatch =
+            task.assigneeId === assigneeFilter ||
+            task.assignee === assigneeFilter ||
+            (matchedUser && (task.assignee === matchedUser.name || task.assigneeId === matchedUser.name)) ||
+            (assigneeFilter === 'USR-101' && task.assigneeId === 'sarah') ||
+            (assigneeFilter === 'USR-102' && task.assigneeId === 'alex') ||
+            (assigneeFilter === 'USR-103' && task.assigneeId === 'david') ||
+            (assigneeFilter === 'USR-104' && task.assigneeId === 'elena');
+          if (!isMatch) return false;
+        }
       }
 
       if (quickFilter === 'my_issues') {
-        const currentUser = TEAM_MEMBERS.find((m) => m.isCurrentUser) || TEAM_MEMBERS[0];
-        if (task.assigneeId !== currentUser?.id) return false;
+        const currentUser = users[0];
+        const isCurrent =
+          currentUser &&
+          (task.assigneeId === currentUser.id ||
+            task.assignee === currentUser.name ||
+            (currentUser.id === 'USR-101' && task.assigneeId === 'sarah'));
+        if (!isCurrent) return false;
       } else if (quickFilter === 'bugs') {
         if (task.issueType !== 'bug') return false;
       } else if (quickFilter === 'high_priority') {
@@ -403,11 +572,19 @@ export const BoardProvider = ({ children }) => {
 
       return true;
     });
-  }, [tasks, searchQuery, priorityFilter, typeFilter, assigneeFilter, quickFilter]);
+  }, [tasks, users, searchQuery, priorityFilter, typeFilter, assigneeFilter, quickFilter]);
 
   const openCreateModal = useCallback((colId = 'todo') => {
     setCreateModalDefaultColumn(colId);
     setIsCreateModalOpen(true);
+  }, []);
+
+  const openUserModal = useCallback(() => {
+    setIsUserModalOpen(true);
+  }, []);
+
+  const closeUserModal = useCallback(() => {
+    setIsUserModalOpen(false);
   }, []);
 
   // Keyboard shortcut listener
@@ -417,6 +594,10 @@ export const BoardProvider = ({ children }) => {
       const isInput = tagName === 'input' || tagName === 'textarea' || e.target.isContentEditable;
 
       if (e.key === 'Escape') {
+        if (isUserModalOpen) {
+          setIsUserModalOpen(false);
+          return;
+        }
         if (deleteConfirmTask) {
           setDeleteConfirmTask(null);
           return;
@@ -445,7 +626,7 @@ export const BoardProvider = ({ children }) => {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedTaskId, isCreateModalOpen, deleteConfirmTask, openCreateModal]);
+  }, [selectedTaskId, isCreateModalOpen, isUserModalOpen, deleteConfirmTask, openCreateModal]);
 
   const value = {
     theme,
@@ -454,6 +635,11 @@ export const BoardProvider = ({ children }) => {
     toggleSidebar,
     columns,
     tasks,
+    users,
+    setUsers,
+    getUserById,
+    addUser,
+    deleteUser,
     filteredTasks,
     searchQuery,
     setSearchQuery,
@@ -475,6 +661,10 @@ export const BoardProvider = ({ children }) => {
     openCreateModal,
     deleteConfirmTask,
     setDeleteConfirmTask,
+    isUserModalOpen,
+    setIsUserModalOpen,
+    openUserModal,
+    closeUserModal,
     draggingTaskId,
     setDraggingTaskId,
     dragOverColumnId,
@@ -505,3 +695,4 @@ export const useBoard = () => {
   }
   return context;
 };
+

@@ -1,19 +1,25 @@
 import React from 'react';
 import { useBoard } from '../../context/BoardContext';
-import { Plus, Search, Sun, Moon, Bell } from 'lucide-react';
-import { TEAM_MEMBERS, getInitials } from '../../constants/data';
+import { Plus, Search, Sun, Moon, Users, Filter, UserCheck } from 'lucide-react';
+import { getInitials } from '../../constants/data';
 
 export const Navbar = () => {
   const {
     theme,
     toggleTheme,
     openCreateModal,
+    openUserModal,
     searchQuery,
     setSearchQuery,
+    priorityFilter,
+    setPriorityFilter,
+    assigneeFilter,
+    setAssigneeFilter,
+    users,
     tasks
   } = useBoard();
 
-  const currentUser = TEAM_MEMBERS.find((m) => m.isCurrentUser) || TEAM_MEMBERS[0];
+  const currentUser = users[0] || { name: 'Sarah Connor', color: '#7C3AED' };
 
   // Calculate sprint completion
   const totalTasks = tasks.length;
@@ -42,6 +48,7 @@ export const Navbar = () => {
       </div>
 
       <div className="navbar-center">
+        {/* Search Bar */}
         <div className="navbar-search-wrapper">
           <Search size={15} className="navbar-search-icon" />
           <input
@@ -54,9 +61,104 @@ export const Navbar = () => {
           />
           <kbd className="navbar-search-shortcut" title="Press / to search">/</kbd>
         </div>
+
+        {/* Quick Assignee Filter in Navbar */}
+        <div className="navbar-filters-group" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+            <select
+              className="navbar-filter-select"
+              value={assigneeFilter}
+              onChange={(e) => setAssigneeFilter(e.target.value)}
+              title="Filter tasks by Assignee"
+              style={{
+                fontSize: '12px',
+                padding: '6px 10px',
+                borderRadius: '6px',
+                border: '1px solid var(--border-subtle)',
+                backgroundColor: assigneeFilter !== 'all' ? 'var(--jira-blue-tint)' : 'var(--bg-surface)',
+                borderColor: assigneeFilter !== 'all' ? 'var(--jira-blue)' : 'var(--border-subtle)',
+                color: 'var(--text-primary)',
+                fontWeight: assigneeFilter !== 'all' ? 600 : 400,
+                cursor: 'pointer'
+              }}
+            >
+              <option value="all">All Assignees</option>
+              <option value="unassigned">Unassigned</option>
+              {users.map((user) => (
+                <option key={user.id} value={user.id}>
+                  {user.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Quick Priority Filter in Navbar */}
+          <select
+            className="navbar-filter-select"
+            value={priorityFilter}
+            onChange={(e) => setPriorityFilter(e.target.value)}
+            title="Filter tasks by Priority"
+            style={{
+              fontSize: '12px',
+              padding: '6px 10px',
+              borderRadius: '6px',
+              border: '1px solid var(--border-subtle)',
+              backgroundColor: priorityFilter !== 'all' ? 'var(--jira-blue-tint)' : 'var(--bg-surface)',
+              borderColor: priorityFilter !== 'all' ? 'var(--jira-blue)' : 'var(--border-subtle)',
+              color: 'var(--text-primary)',
+              fontWeight: priorityFilter !== 'all' ? 600 : 400,
+              cursor: 'pointer'
+            }}
+          >
+            <option value="all">All Priorities</option>
+            <option value="urgent">🔥 Urgent</option>
+            <option value="high">🔺 High</option>
+            <option value="medium">⏸ Medium</option>
+            <option value="low">🔻 Low</option>
+          </select>
+        </div>
       </div>
 
       <div className="navbar-right">
+        {/* Manage Team Button */}
+        <button
+          className="btn-manage-team"
+          onClick={openUserModal}
+          title="Manage workspace team members"
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '6px',
+            fontSize: '12px',
+            fontWeight: 600,
+            padding: '6px 12px',
+            borderRadius: '6px',
+            border: '1px solid var(--border-subtle)',
+            backgroundColor: 'var(--bg-surface)',
+            color: 'var(--text-primary)',
+            cursor: 'pointer',
+            transition: 'all 0.15s ease'
+          }}
+          onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'var(--bg-surface-secondary)')}
+          onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'var(--bg-surface)')}
+        >
+          <Users size={15} color="var(--jira-blue)" />
+          <span>Manage Team</span>
+          <span
+            style={{
+              backgroundColor: 'var(--jira-blue-subtle)',
+              color: 'var(--jira-blue)',
+              fontSize: '10px',
+              padding: '1px 5px',
+              borderRadius: '10px',
+              fontWeight: 700
+            }}
+          >
+            {users.length}
+          </span>
+        </button>
+
+        {/* Create Issue Button */}
         <button
           className="btn-create-task"
           onClick={() => openCreateModal('todo')}
@@ -87,21 +189,22 @@ export const Navbar = () => {
           {theme === 'light' ? <Moon size={17} /> : <Sun size={17} />}
         </button>
 
-        {/* Notifications mock */}
-        <button className="navbar-icon-btn" title="Recent activity & notifications">
-          <Bell size={17} />
-        </button>
-
-        {/* User Avatar */}
-        <div className="user-profile-badge" title={`${currentUser.name} (${currentUser.role})`}>
+        {/* Current User Avatar with Team Modal Trigger */}
+        <div
+          className="user-profile-badge"
+          onClick={openUserModal}
+          style={{ cursor: 'pointer' }}
+          title={`Logged in as ${currentUser.name} — Click to manage team`}
+        >
           <div
             className="avatar-circle"
-            style={{ backgroundColor: currentUser.avatarColor }}
+            style={{ backgroundColor: currentUser.color || '#7C3AED' }}
           >
-            {currentUser.initials || getInitials(currentUser.name)}
+            {getInitials(currentUser.name)}
           </div>
         </div>
       </div>
     </header>
   );
 };
+

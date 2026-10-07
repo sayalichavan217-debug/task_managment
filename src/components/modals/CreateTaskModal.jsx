@@ -1,18 +1,17 @@
 import React, { useState } from 'react';
 import { useBoard } from '../../context/BoardContext';
-import { TEAM_MEMBERS, COLUMNS, formatDate } from '../../constants/data';
+import { COLUMNS, formatDate } from '../../constants/data';
 import { X } from 'lucide-react';
 
 const CreateTaskModalForm = ({ defaultColumn, onClose }) => {
-  const { createTask } = useBoard();
+  const { createTask, users } = useBoard();
 
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [columnId, setColumnId] = useState(defaultColumn || 'todo');
   const [issueType, setIssueType] = useState('task');
   const [priority, setPriority] = useState('medium');
-  const currentUser = TEAM_MEMBERS.find((m) => m.isCurrentUser) || TEAM_MEMBERS[0];
-  const [assigneeId, setAssigneeId] = useState(currentUser?.id || 'sarah');
+  const [assigneeId, setAssigneeId] = useState(users[0]?.id || 'unassigned');
   const [tagsInput, setTagsInput] = useState('');
   const [storyPoints, setStoryPoints] = useState('3');
   const [dueDate, setDueDate] = useState('');
@@ -37,7 +36,7 @@ const CreateTaskModalForm = ({ defaultColumn, onClose }) => {
       columnId,
       issueType,
       priority,
-      assigneeId,
+      assigneeId: assigneeId === 'unassigned' ? '' : assigneeId,
       tags,
       storyPoints: Number(storyPoints) || 1,
       dueDate
@@ -168,9 +167,10 @@ const CreateTaskModalForm = ({ defaultColumn, onClose }) => {
                 value={assigneeId}
                 onChange={(e) => setAssigneeId(e.target.value)}
               >
-                {TEAM_MEMBERS.map((m) => (
+                <option value="unassigned">Unassigned</option>
+                {users.map((m) => (
                   <option key={m.id} value={m.id}>
-                    {m.name} ({m.role})
+                    {m.name} ({m.email})
                   </option>
                 ))}
               </select>
@@ -254,3 +254,4 @@ export const CreateTaskModal = () => {
     </div>
   );
 };
+

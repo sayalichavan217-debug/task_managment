@@ -2,8 +2,8 @@ import React, { useState } from 'react';
 import { useBoard } from '../../context/BoardContext';
 import { IssueTypeIcon } from '../common/IssueTypeIcon';
 import { PriorityBadge } from '../common/PriorityBadge';
-import { TEAM_MEMBERS, COLUMNS, getInitials, formatDate } from '../../constants/data';
-import { CheckSquare, MoreHorizontal, Trash2, Edit3, ArrowRight, Calendar } from 'lucide-react';
+import { COLUMNS, getInitials, formatDate } from '../../constants/data';
+import { CheckSquare, MoreHorizontal, Trash2, Edit3, ArrowRight, Calendar, UserX } from 'lucide-react';
 
 export const TaskCard = ({ task }) => {
   const {
@@ -11,16 +11,14 @@ export const TaskCard = ({ task }) => {
     setDeleteConfirmTask,
     draggingTaskId,
     setDraggingTaskId,
-    moveTask
+    moveTask,
+    getUserById
   } = useBoard();
 
   const [menuOpen, setMenuOpen] = useState(false);
 
-  const assignee = TEAM_MEMBERS.find((m) => m.id === task.assigneeId) || {
-    name: 'Unassigned',
-    initials: '?',
-    avatarColor: '#9CA3AF'
-  };
+  const assignee = getUserById(task.assigneeId || task.assignee);
+  const isAssigned = !!assignee;
 
   const isDragging = draggingTaskId === task.id;
 
@@ -225,15 +223,69 @@ export const TaskCard = ({ task }) => {
             </span>
           ) : null}
 
-          <div
-            className="card-assignee-avatar"
-            style={{ backgroundColor: assignee.avatarColor }}
-            title={`Assigned to ${assignee.name}`}
-          >
-            {assignee.initials || getInitials(assignee.name)}
-          </div>
+          {/* Assignee Avatar Badge with Initials & Name Tooltip */}
+          {isAssigned ? (
+            <div
+              className="card-assignee-avatar-wrapper"
+              style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+              title={`Assigned to ${assignee.name} (${assignee.email})`}
+            >
+              <div
+                className="card-assignee-avatar"
+                style={{
+                  backgroundColor: assignee.color || '#3B82F6',
+                  color: '#ffffff',
+                  fontWeight: 700,
+                  fontSize: '11px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  width: '24px',
+                  height: '24px',
+                  borderRadius: '50%',
+                  boxShadow: '0 1px 2px rgba(0,0,0,0.1)'
+                }}
+              >
+                {getInitials(assignee.name)}
+              </div>
+              <span
+                style={{
+                  fontSize: '11px',
+                  color: 'var(--text-secondary)',
+                  fontWeight: 500,
+                  maxWidth: '75px',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap'
+                }}
+              >
+                {assignee.name.split(' ')[0]}
+              </span>
+            </div>
+          ) : (
+            <div
+              className="card-assignee-avatar unassigned"
+              style={{
+                backgroundColor: 'var(--bg-surface-tertiary)',
+                color: 'var(--text-tertiary)',
+                border: '1px dashed var(--border-medium)',
+                width: '24px',
+                height: '24px',
+                borderRadius: '50%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '11px',
+                fontWeight: 600
+              }}
+              title="Unassigned"
+            >
+              ?
+            </div>
+          )}
         </div>
       </div>
     </div>
   );
 };
+

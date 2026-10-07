@@ -7,6 +7,7 @@ import { AnalyticsView } from './components/analytics/AnalyticsView';
 import { CreateTaskModal } from './components/modals/CreateTaskModal';
 import { TaskDetailModal } from './components/modals/TaskDetailModal';
 import { DeleteConfirmModal } from './components/modals/DeleteConfirmModal';
+import { UserModal } from './components/UserModal';
 import { ToastContainer } from './components/common/ToastContainer';
 
 const MainLayout = () => {
@@ -31,6 +32,7 @@ const MainLayout = () => {
       <CreateTaskModal />
       <TaskDetailModal />
       <DeleteConfirmModal />
+      <UserModal />
       <ToastContainer />
     </div>
   );
@@ -43,3 +45,4 @@ export default function App() {
     </BoardProvider>
   );
 }
+
