@@ -4,7 +4,7 @@ import { PRIORITIES, TEAM_MEMBERS, COLUMNS, getInitials } from '../../constants/
 import { CheckCircle2, Clock, AlertTriangle, Layers, ArrowLeft } from 'lucide-react';
 
 export const AnalyticsView = () => {
-  const { tasks, setActiveView } = useBoard();
+  const { tasks, users, setActiveView } = useBoard();
 
   const total = tasks.length;
   const completed = tasks.filter((t) => t.columnId === 'done').length;
@@ -170,8 +170,17 @@ export const AnalyticsView = () => {
             gap: '12px'
           }}
         >
-          {TEAM_MEMBERS.map((member) => {
-            const memberTasks = tasks.filter((t) => t.assigneeId === member.id);
+          {users.map((member) => {
+            const memberTasks = tasks.filter(
+              (t) =>
+                t.assigneeId === member.id ||
+                t.assignee === member.id ||
+                t.assignee === member.name ||
+                (member.id === 'USR-101' && t.assigneeId === 'sarah') ||
+                (member.id === 'USR-102' && t.assigneeId === 'alex') ||
+                (member.id === 'USR-103' && t.assigneeId === 'david') ||
+                (member.id === 'USR-104' && t.assigneeId === 'elena')
+            );
             const memberDone = memberTasks.filter((t) => t.columnId === 'done').length;
             const completion = memberTasks.length > 0 ? Math.round((memberDone / memberTasks.length) * 100) : 0;
 
@@ -191,13 +200,13 @@ export const AnalyticsView = () => {
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                   <div
                     className="avatar-circle"
-                    style={{ backgroundColor: member.avatarColor }}
+                    style={{ backgroundColor: member.color || '#3B82F6' }}
                   >
-                    {member.initials || getInitials(member.name)}
+                    {getInitials(member.name)}
                   </div>
                   <div style={{ overflow: 'hidden' }}>
                     <div style={{ fontWeight: 600, fontSize: '13px' }}>{member.name}</div>
-                    <div style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>{member.role}</div>
+                    <div style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>{member.email}</div>
                   </div>
                 </div>
 
@@ -209,7 +218,7 @@ export const AnalyticsView = () => {
                 <div className="progress-track">
                   <div
                     className="progress-fill"
-                    style={{ width: `${completion}%`, backgroundColor: member.avatarColor }}
+                    style={{ width: `${completion}%`, backgroundColor: member.color || '#3B82F6' }}
                   />
                 </div>
               </div>

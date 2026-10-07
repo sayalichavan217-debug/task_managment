@@ -1,7 +1,6 @@
 import React from 'react';
 import { useBoard } from '../../context/BoardContext';
 import { Search, X } from 'lucide-react';
-import { TEAM_MEMBERS } from '../../constants/data';
 
 export const BoardFilterBar = () => {
   const {
@@ -16,7 +15,8 @@ export const BoardFilterBar = () => {
     quickFilter,
     setQuickFilter,
     filteredTasks,
-    tasks
+    tasks,
+    users
   } = useBoard();
 
   const isAnyFilterActive =
@@ -93,7 +93,8 @@ export const BoardFilterBar = () => {
           title="Filter by Assignee"
         >
           <option value="all">Assignee: All</option>
-          {TEAM_MEMBERS.map((member) => (
+          <option value="unassigned">Unassigned</option>
+          {users.map((member) => (
             <option key={member.id} value={member.id}>
               {member.name}
             </option>

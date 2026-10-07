@@ -95,57 +95,47 @@ export const COLUMNS = [
   }
 ];
 
-export const TEAM_MEMBERS = [
+export const DEFAULT_USERS = [
   {
-    id: 'sarah',
+    id: 'USR-101',
     name: 'Sarah Connor',
-    role: 'Lead Architect',
     email: 'sarah.c@jira.internal',
-    initials: 'SC',
-    avatarColor: '#7C3AED',
-    isCurrentUser: true
+    color: '#7C3AED'
   },
   {
-    id: 'alex',
+    id: 'USR-102',
     name: 'Alex Morgan',
-    role: 'Senior Product Manager',
     email: 'alex.m@jira.internal',
-    initials: 'AM',
-    avatarColor: '#2563EB',
-    isCurrentUser: false
+    color: '#2563EB'
   },
   {
-    id: 'david',
+    id: 'USR-103',
     name: 'David Kim',
-    role: 'Staff Frontend Engineer',
     email: 'david.k@jira.internal',
-    initials: 'DK',
-    avatarColor: '#059669',
-    isCurrentUser: false
+    color: '#059669'
   },
   {
-    id: 'elena',
-    name: 'Elena Rostova',
-    role: 'Security & QA Engineer',
-    email: 'elena.r@jira.internal',
-    initials: 'ER',
-    avatarColor: '#DC2626',
-    isCurrentUser: false
-  },
-  {
-    id: 'marcus',
-    name: 'Marcus Vance',
-    role: 'Site Reliability Engineer',
-    email: 'marcus.v@jira.internal',
-    initials: 'MV',
-    avatarColor: '#D97706',
-    isCurrentUser: false
+    id: 'USR-104',
+    name: 'Elena Banvari',
+    email: 'elena.b@jira.internal',
+    color: '#DC2626'
   }
 ];
 
-export const CURRENT_USER = TEAM_MEMBERS[0];
+export const USER_COLOR_PALETTE = [
+  '#3B82F6', // Blue
+  '#7C3AED', // Purple
+  '#059669', // Emerald
+  '#DC2626', // Red
+  '#D97706', // Amber
+  '#0891B2', // Cyan
+  '#DB2777', // Pink
+  '#4F46E5', // Indigo
+  '#16A34A', // Green
+  '#9333EA'  // Fuchsia
+];
 
-export const getInitials = (name, fallback = 'SC') => {
+export const getInitials = (name, fallback = '?') => {
   if (!name) return fallback;
   const parts = name.trim().split(/\s+/).filter(Boolean);
   if (parts.length === 0) return fallback;
@@ -171,6 +161,15 @@ export const formatDate = (dateInput) => {
   return `${day}-${month}-${year}`;
 };
 
+export const TEAM_MEMBERS = DEFAULT_USERS.map((u) => ({
+  ...u,
+  role: 'Engineer',
+  avatarColor: u.color,
+  initials: getInitials(u.name)
+}));
+
+export const CURRENT_USER = DEFAULT_USERS[0];
+
 export const INITIAL_TASKS = [
   {
     id: 'KAN-101',
@@ -179,7 +178,7 @@ export const INITIAL_TASKS = [
     columnId: 'todo',
     issueType: 'story',
     priority: 'high',
-    assigneeId: 'sarah',
+    assigneeId: 'USR-101',
     tags: ['Security', 'Auth', 'Backend'],
     storyPoints: 5,
     dueDate: '2026-10-15',
@@ -207,7 +206,7 @@ export const INITIAL_TASKS = [
     columnId: 'in_progress',
     issueType: 'story',
     priority: 'high',
-    assigneeId: 'sarah',
+    assigneeId: 'USR-102',
     tags: ['Frontend', 'Kanban', 'UX'],
     storyPoints: 8,
     dueDate: '2026-10-09',
@@ -219,8 +218,8 @@ export const INITIAL_TASKS = [
     comments: [
       {
         id: 'c-3',
-        author: 'Sarah Connor',
-        avatar: 'SC',
+        author: 'Alex Morgan',
+        avatar: 'AM',
         text: 'Native HTML5 drag & drop is buttery smooth and zero external runtime dependencies!',
         createdAt: '2026-10-05T16:00:00.000Z'
       }
@@ -235,7 +234,7 @@ export const INITIAL_TASKS = [
     columnId: 'in_review',
     issueType: 'task',
     priority: 'high',
-    assigneeId: 'marcus',
+    assigneeId: 'USR-104',
     tags: ['DevOps', 'Security', 'Docker'],
     storyPoints: 3,
     dueDate: '2026-10-07',
@@ -247,8 +246,8 @@ export const INITIAL_TASKS = [
     comments: [
       {
         id: 'c-4',
-        author: 'Marcus Vance',
-        avatar: 'MV',
+        author: 'Elena Banvari',
+        avatar: 'EB',
         text: 'All 4 critical CVEs resolved. Ready for final peer sign-off.',
         createdAt: '2026-10-06T09:30:00.000Z'
       }
@@ -263,7 +262,7 @@ export const INITIAL_TASKS = [
     columnId: 'done',
     issueType: 'story',
     priority: 'medium',
-    assigneeId: 'david',
+    assigneeId: 'USR-103',
     tags: ['UI/UX', 'Accessibility', 'Theme'],
     storyPoints: 3,
     dueDate: '2026-10-06',

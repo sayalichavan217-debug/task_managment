@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useBoard } from '../../context/BoardContext';
 import { IssueTypeIcon } from '../common/IssueTypeIcon';
-import { TEAM_MEMBERS, COLUMNS, getInitials, formatDate } from '../../constants/data';
+import { COLUMNS, getInitials, formatDate } from '../../constants/data';
 import { X, Trash2, CheckSquare, Plus, MessageSquare, Send } from 'lucide-react';
 
 const TaskDetailModalContent = ({ task, onClose }) => {
@@ -12,7 +12,9 @@ const TaskDetailModalContent = ({ task, onClose }) => {
     toggleSubtask,
     deleteSubtask,
     addComment,
-    setDeleteConfirmTask
+    setDeleteConfirmTask,
+    users,
+    getUserById
   } = useBoard();
 
   const [title, setTitle] = useState(task.title);
@@ -52,7 +54,7 @@ const TaskDetailModalContent = ({ task, onClose }) => {
 
   // Handle assignee change
   const handleAssigneeChange = (newAssigneeId) => {
-    updateTask(task.id, { assigneeId: newAssigneeId });
+    updateTask(task.id, { assigneeId: newAssigneeId === 'unassigned' ? '' : newAssigneeId });
   };
 
   // Handle story points change
@@ -95,7 +97,7 @@ const TaskDetailModalContent = ({ task, onClose }) => {
     }
   };
 
-  const currentUser = TEAM_MEMBERS.find((m) => m.isCurrentUser) || TEAM_MEMBERS[0];
+  const currentUser = users[0] || { name: 'Sarah Connor', color: '#7C3AED' };
 
   // Comment handler
   const handleAddComment = (e) => {
@@ -110,10 +112,9 @@ const TaskDetailModalContent = ({ task, onClose }) => {
   const completedSubtasks = task.subtasks?.filter((s) => s.completed).length || 0;
   const subtaskProgress = totalSubtasks > 0 ? Math.round((completedSubtasks / totalSubtasks) * 100) : 0;
 
-  const currentAssignee = TEAM_MEMBERS.find((m) => m.id === task.assigneeId) || {
+  const currentAssignee = getUserById(task.assigneeId || task.assignee) || {
     name: 'Unassigned',
-    initials: '?',
-    avatarColor: '#9CA3AF'
+    color: '#9CA3AF'
   };
 
   return (
@@ -360,7 +361,7 @@ const TaskDetailModalContent = ({ task, onClose }) => {
                       className="avatar-circle"
                       style={{
                         backgroundColor:
-                          TEAM_MEMBERS.find(m => m.name === comment.author || m.initials === comment.avatar)?.avatarColor || '#7C3AED',
+                          users.find((m) => m.name === comment.author || getInitials(m.name) === comment.avatar)?.color || '#7C3AED',
                         width: '26px',
                         height: '26px'
                       }}
@@ -407,18 +408,19 @@ const TaskDetailModalContent = ({ task, onClose }) => {
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <div
                   className="avatar-circle"
-                  style={{ backgroundColor: currentAssignee.avatarColor }}
+                  style={{ backgroundColor: currentAssignee.color || currentAssignee.avatarColor || '#9CA3AF' }}
                 >
-                  {currentAssignee.initials || getInitials(currentAssignee.name)}
+                  {getInitials(currentAssignee.name)}
                 </div>
                 <select
                   className="form-select"
-                  value={task.assigneeId}
+                  value={task.assigneeId || 'unassigned'}
                   onChange={(e) => handleAssigneeChange(e.target.value)}
                 >
-                  {TEAM_MEMBERS.map((m) => (
+                  <option value="unassigned">Unassigned</option>
+                  {users.map((m) => (
                     <option key={m.id} value={m.id}>
-                      {m.name}
+                      {m.name} ({m.email})
                     </option>
                   ))}
                 </select>

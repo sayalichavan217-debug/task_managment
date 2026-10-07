@@ -1,6 +1,5 @@
 import React from 'react';
 import { useBoard } from '../../context/BoardContext';
-import { TEAM_MEMBERS } from '../../constants/data';
 import {
   Kanban,
   BarChart3,
@@ -11,7 +10,8 @@ import {
   Flame,
   Bug,
   RotateCcw,
-  Layers
+  Layers,
+  Users
 } from 'lucide-react';
 
 export const Sidebar = () => {
@@ -23,12 +23,19 @@ export const Sidebar = () => {
     quickFilter,
     setQuickFilter,
     resetToMockData,
-    tasks
+    openUserModal,
+    tasks,
+    users
   } = useBoard();
 
-  const currentUser = TEAM_MEMBERS.find((m) => m.isCurrentUser) || TEAM_MEMBERS[0];
+  const currentUser = users[0] || { name: 'Sarah Connor', id: 'USR-101' };
   const totalTasks = tasks.length;
-  const myTasksCount = tasks.filter((t) => t.assigneeId === currentUser?.id).length;
+  const myTasksCount = tasks.filter(
+    (t) =>
+      t.assigneeId === currentUser?.id ||
+      t.assignee === currentUser?.name ||
+      (currentUser?.id === 'USR-101' && t.assigneeId === 'sarah')
+  ).length;
   const bugTasksCount = tasks.filter((t) => t.issueType === 'bug').length;
   const urgentTasksCount = tasks.filter((t) => t.priority === 'urgent' || t.priority === 'high').length;
 
