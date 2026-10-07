@@ -135,15 +135,6 @@ export const USER_COLOR_PALETTE = [
   '#9333EA'  // Fuchsia
 ];
 
-export const TEAM_MEMBERS = DEFAULT_USERS.map((u) => ({
-  ...u,
-  role: 'Engineer',
-  avatarColor: u.color,
-  initials: getInitials ? getInitials(u.name) : 'TM'
-}));
-
-export const CURRENT_USER = DEFAULT_USERS[0];
-
 export const getInitials = (name, fallback = '?') => {
   if (!name) return fallback;
   const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -169,6 +160,15 @@ export const formatDate = (dateInput) => {
   const year = d.getFullYear();
   return `${day}-${month}-${year}`;
 };
+
+export const TEAM_MEMBERS = DEFAULT_USERS.map((u) => ({
+  ...u,
+  role: 'Engineer',
+  avatarColor: u.color,
+  initials: getInitials(u.name)
+}));
+
+export const CURRENT_USER = DEFAULT_USERS[0];
 
 export const INITIAL_TASKS = [
   {
